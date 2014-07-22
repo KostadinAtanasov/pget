@@ -1,0 +1,11 @@
+			pget
+
+What is pget?
+
+	pget is simple python script which could be use to download media from
+	podcast when they have RSS feeds.
+
+Setup:
+
+	pget require $HOME/.config/pget/podcasts.ini which is similar to
+	examplerss.ini in the repo.
