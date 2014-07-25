@@ -7,5 +7,5 @@ What is pget?
 
 Setup:
 
-	pget require $HOME/.config/pget/podcasts.ini which is similar to
-	examplerss.ini in the repo.
+	pget require $HOME/.config/pget/podcasts.ini there's template in the
+	repo.
