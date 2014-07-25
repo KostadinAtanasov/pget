@@ -63,7 +63,7 @@ class FeedItem:
     def shoulddownload(self, fname, path):
         return not os.path.exists(os.path.join(path, fname))
 
-    def download(self, path, verbose=False):
+    def download(self, path, verbose=False, tell=False):
         cwd = os.getcwd()
         resp = None
         try:
@@ -106,6 +106,8 @@ class FeedItem:
                     f.write(chunk)
                 if totalsize == length:
                     os.rename(tmpfname, fname)
+                    if tell:
+                        print('%s downloaded' % fn)
         except Exception as e:
             print('[pget] Error downloading %s' % self.title)
             print('[pget]\t%s' % str(e))
@@ -230,10 +232,12 @@ class App:
         parser.add_argument('-d', '--date', help=datehelp)
         rmhelp = 'remove files older than given days(0 remove all)'
         parser.add_argument('-r', '--rmolder', type=int, help=rmhelp)
-        parser.add_argument('-v', '--verbose', action='store_true',
-                            help='be verbose')
         parser.add_argument('-s', '--stall', action='store_true',
                             help='clear interrupted downloads')
+        parser.add_argument('-v', '--verbose', action='store_true',
+                            help='be verbose')
+        parser.add_argument('-t', '--tell', action='store_true',
+                            help='tell when each download finished')
         self.args = parser.parse_args()
         if self.args.podcastfile is not None:
             self.podcastfile = self.args.podcastfile
@@ -264,7 +268,7 @@ class App:
                 os.mkdir(fulldir)
             if len(newer) > 0:
                 for f in newer:
-                    f.download(fulldir, self.args.verbose)
+                    f.download(fulldir, self.args.verbose, self.args.tell)
 
 if __name__ == '__main__':
     app = App()
