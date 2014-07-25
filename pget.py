@@ -221,9 +221,7 @@ class App:
     def parsecmd(self):
         if self.args is not None:
             return # Already parsed
-        parser = argparse.ArgumentParser('Podcast Getter')
-        parser.add_argument('-c', '--cron', action='store_true',
-                            help='run from cron')
+        parser = argparse.ArgumentParser('pget')
         parser.add_argument('-i', '--inifile',
                             help='read configuration defined in inifile')
         parser.add_argument('-p', '--podcastfile',
@@ -250,12 +248,12 @@ class App:
         self.pconfig.read(self.podcastfile)
 
     def handlefeed(self, feed):
-        if self.args.stall is not None:
+        if self.args.stall:
             # TODO: remove all files with download extension
-            pass
+            print('remove partially downloaded files - not implemented')
         if self.args.rmolder is not None:
             # TODO: get guids from CONFDIR/media and delete them
-            pass
+            print('rmolder - not implemented')
         else:
             newer = feed.getnewer()
             # Create download dir if not exists
@@ -272,12 +270,11 @@ if __name__ == '__main__':
     app = App()
     app.parsecmd()
     app.loadconfig()
-    if app.args.cron:
-        for secstr in app.pconfig.sections():
-            sec = app.pconfig[secstr]
-            valid = 'title' in sec and 'url' in sec
-            valid = valid and 'dpath' in sec and 'dir' in sec
-            if valid:
-                feed = Feed(sec['url'], sec['dpath'], sec['dir'], sec['days'])
-                feed.poll()
-                app.handlefeed(feed)
+    for secstr in app.pconfig.sections():
+        sec = app.pconfig[secstr]
+        valid = 'title' in sec and 'url' in sec
+        valid = valid and 'dpath' in sec and 'dir' in sec
+        if valid:
+            feed = Feed(sec['url'], sec['dpath'], sec['dir'], sec['days'])
+            feed.poll()
+            app.handlefeed(feed)
