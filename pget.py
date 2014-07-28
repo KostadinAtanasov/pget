@@ -63,11 +63,14 @@ class FeedItem:
     def shoulddownload(self, fname, path):
         return not os.path.exists(os.path.join(path, fname))
 
+    def getfilename(self):
+        return self.url.split('/')[-1]
+
     def download(self, path, verbose=False, tell=False):
         cwd = os.getcwd()
         resp = None
         try:
-            fn = self.url.split('/')[-1]
+            fn = self.getfilename()
             fname = os.path.join(path, fn)
             if not self.shoulddownload(fn, path):
                 if verbose:
@@ -203,12 +206,35 @@ class Feed:
         fis = sorted(self.items, key=lambda x: parsedate(x.pubdate))
         self.items = fis[::-1]
 
+class DownloadedFile:
+    def __init__(self, title, path, time):
+        self.title = title
+        self.path = path
+        self.time = time
+
+        self.timedelta = 0
+
+    def __eq__(self, other):
+        ret = self.title == other.title and self.path == other.path
+        ret = abs(self.time - other.time) <= (self.timedelta + other.timedelta)
+        return ret
+
+    def isinlist(self, l):
+        for df in l:
+            if self == df:
+                return True
+        return False
+
 ###############################################################################
 # Application handling
 ###############################################################################
-CONFDIR = os.environ['HOME'] + '/.config/pget'
-CONFFILE = CONFDIR + '/pget.ini'
-PODCASTFILE = CONFDIR + '/podcasts.ini'
+CONFDIR = os.path.join(os.path.join(os.environ['HOME'], '.config'), 'pget')
+CONFFILE = os.path.join(CONFDIR, 'pget.ini')
+PODCASTFILE = os.path.join(CONFDIR, 'podcasts.ini')
+DOWNLOADEDFILE = os.path.join(CONFDIR, 'downloaded.ini')
+
+DEFAULTCHECKDAYS = 7
+DEFAULTLISTDAYS = 30
 
 class App:
     def __init__(self):
@@ -219,6 +245,11 @@ class App:
 
         self.podcastfile = PODCASTFILE
         self.pconfig = None
+
+        self.downfile = DOWNLOADEDFILE
+        self.dconfig = None
+
+        self.downloaded = []
 
     def parsecmd(self):
         if self.args is not None:
@@ -231,7 +262,10 @@ class App:
         datehelp = 'date(%%d/%%m/%%Y) only newer files will be downloaded'
         parser.add_argument('-d', '--date', help=datehelp)
         rmhelp = 'remove files older than given days(0 remove all)'
-        parser.add_argument('-r', '--rmolder', type=int, help=rmhelp)
+        parser.add_argument('-r', '--rmolder', type=int,
+                            help=rmhelp)
+        parser.add_argument('-c', '--clean', action='store_true',
+                            help='clean what you can')
         parser.add_argument('-s', '--stall', action='store_true',
                             help='clear interrupted downloads')
         parser.add_argument('-v', '--verbose', action='store_true',
@@ -245,40 +279,114 @@ class App:
             self.configfile = self.args.inifile
 
     def loadconfig(self):
-        if self.config is not None:
-            return # Already loaded, should explicitly reaload it
-        #self.config = configparser.ConfigParser()
-        self.pconfig = configparser.ConfigParser()
-        self.pconfig.read(self.podcastfile)
+        if self.config is None:
+            pass # TODO: load config
+        if self.pconfig is None:
+            self.pconfig = configparser.ConfigParser()
+            if os.path.isfile(self.podcastfile):
+                self.pconfig.read(self.podcastfile)
+        if self.dconfig is None:
+            self.dconfig = configparser.ConfigParser()
+            if os.path.isfile(self.downfile):
+                self.dconfig.read(self.downfile)
+                for sec in self.dconfig.sections():
+                    title = sec
+                    path = self.dconfig[sec]['path']
+                    time = float(self.dconfig[sec]['time'])
+                    self.downloaded.append(DownloadedFile(title, path, time))
+            else: # Just create it
+                with open(self.downfile, 'w') as f:
+                    pass
+            pass # TODO: load list of downloaded files
+
+    def addtodconfig(self, dfile):
+        if self.dconfig is None:
+            self.dconfig = configparser.ConfigParser()
+        self.dconfig[dfile.title] = {
+            'path': dfile.path, 'time': dfile.time
+            }
+
+    def isindconfig(self, df):
+        if self.dconfig is None:
+            return False
+
+    def cleanstall(self, path):
+        for f in os.listdir(path):
+            if f.endswith('.downloading'):
+                os.unlink(os.path.join(path, f))
+
+    def cleanolder(self, days):
+        st = time.time() - (24 * 60 * 60 * float(days))
+        for secstr in self.dconfig:
+            sec = self.dconfig[secstr]
+            if 'time' in sec:
+                t = float(sec['time'])
+                if (t - st) < 0:
+                    os.unlink(sec['path'])
 
     def handlefeed(self, feed):
-        if self.args.stall:
-            # TODO: remove all files with download extension
-            print('remove partially downloaded files - not implemented')
-        if self.args.rmolder is not None:
-            # TODO: get guids from CONFDIR/media and delete them
-            print('rmolder - not implemented')
-        else:
-            newer = feed.getnewer()
-            # Create download dir if not exists
-            if not os.path.isdir(feed.dpath):
-                os.mkdir(feed.dpath)
-            fulldir = os.path.join(feed.dpath, feed.ddir)
-            if not os.path.isdir(fulldir):
-                os.mkdir(fulldir)
-            if len(newer) > 0:
-                for f in newer:
+        newer = feed.getnewer()
+        # Create download dir if not exists
+        if not os.path.isdir(feed.dpath):
+            os.mkdir(feed.dpath)
+        fulldir = os.path.join(feed.dpath, feed.ddir)
+        if not os.path.isdir(fulldir):
+            os.mkdir(fulldir)
+        if len(newer) > 0:
+            for f in newer:
+                title = f.getfilename()
+                fname = os.path.join(fulldir, title)
+                #title = title.split('.')[0]
+                t = time.mktime(parsedate(f.pubdate))
+                df = DownloadedFile(title, fname, t)
+                # TODO: remove downloaded, use self.dconfig instead
+                if not df.isinlist(self.downloaded):
                     f.download(fulldir, self.args.verbose, self.args.tell)
+                    self.downloaded.append(df)
+                    self.addtodconfig(df)
+                    # Update downloaded file
+                    with open(self.downfile, 'w') as f:
+                        self.dconfig.write(f)
+                elif self.args.verbose:
+                    print('%s listed as downloaded' % title)
+
+def dostallaction(app):
+    for secstr in app.pconfig.sections():
+        sec = app.pconfig[secstr]
+        if ('dpath' in sec) and ('dir' in sec):
+            path = os.path.join(sec['dpath'], sec['dir'])
+            app.cleanstall(path)
+
+def dormolderaction(app):
+    # TODO: mark in downloaded.ini file that file is removed
+    for secstr in app.pconfig.sections():
+        sec = app.pconfig[secstr]
+        app.cleanolder(app.args.rmolder)
 
 if __name__ == '__main__':
     app = App()
     app.parsecmd()
     app.loadconfig()
-    for secstr in app.pconfig.sections():
-        sec = app.pconfig[secstr]
-        valid = 'title' in sec and 'url' in sec
-        valid = valid and 'dpath' in sec and 'dir' in sec
-        if valid:
-            feed = Feed(sec['url'], sec['dpath'], sec['dir'], sec['days'])
-            feed.poll()
-            app.handlefeed(feed)
+    if app.args.clean:
+        dostallaction(app)
+        if app.args.rmolder is None:
+            app.args.rmolder = 7
+            dormolderaction(app)
+        app.args.rmolder = DEFAULTLISTDAYS
+        dormolderaction(app)
+    elif app.args.stall:
+        dostallaction(app)
+    elif app.args.rmolder is not None:
+        dormolderaction(app)
+    else:
+        for secstr in app.pconfig.sections():
+            sec = app.pconfig[secstr]
+            valid = 'title' in sec and 'url' in sec
+            valid = valid and 'dpath' in sec and 'dir' in sec
+            if valid:
+                feed = Feed(sec['url'], sec['dpath'], sec['dir'], sec['days'])
+                feed.poll()
+                app.handlefeed(feed)
+        # TODO: check in config file if we want this
+        app.args.rmolder = DEFAULTLISTDAYS
+        dormolderaction(app)
