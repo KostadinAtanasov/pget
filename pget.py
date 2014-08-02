@@ -323,6 +323,9 @@ class App:
                 t = float(sec['time'])
                 if (t - st) < 0:
                     os.unlink(sec['path'])
+                    self.dconfig.remove_section(secstr)
+        with open(self.downfile, 'w') as f:
+            self.dconfig.write(f)
 
     def handlefeed(self, feed):
         newer = feed.getnewer()
