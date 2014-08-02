@@ -317,6 +317,7 @@ class App:
 
     def cleanolder(self, days):
         st = time.time() - (24 * 60 * 60 * float(days))
+        cleaned = False
         for secstr in self.dconfig:
             sec = self.dconfig[secstr]
             if 'time' in sec:
@@ -324,8 +325,10 @@ class App:
                 if (t - st) < 0:
                     os.unlink(sec['path'])
                     self.dconfig.remove_section(secstr)
-        with open(self.downfile, 'w') as f:
-            self.dconfig.write(f)
+                    cleaned = True
+        if cleaned:
+            with open(self.downfile, 'w') as f:
+                self.dconfig.write(f)
 
     def handlefeed(self, feed):
         newer = feed.getnewer()
