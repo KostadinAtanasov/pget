@@ -314,6 +314,8 @@ class App:
         for f in os.listdir(path):
             if f.endswith('.downloading'):
                 os.unlink(os.path.join(path, f))
+                if slef.args.tell:
+                    print('%s removed' % f)
 
     def cleanolder(self, days):
         st = time.time() - (24 * 60 * 60 * float(days))
@@ -326,6 +328,8 @@ class App:
                     os.unlink(sec['path'])
                     self.dconfig.remove_section(secstr)
                     cleaned = True
+                    if slef.args.tell:
+                        print('%s removed' % secstr)
         if cleaned:
             with open(self.downfile, 'w') as f:
                 self.dconfig.write(f)
