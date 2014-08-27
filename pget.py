@@ -325,10 +325,11 @@ class App:
             if 'time' in sec:
                 t = float(sec['time'])
                 if (t - st) < 0:
-                    os.unlink(sec['path'])
+                    if os.path.isfile(sec['path']):
+                        os.unlink(sec['path'])
                     self.dconfig.remove_section(secstr)
                     cleaned = True
-                    if slef.args.tell:
+                    if self.args.tell:
                         print('%s removed' % secstr)
         if cleaned:
             with open(self.downfile, 'w') as f:
@@ -400,3 +401,4 @@ if __name__ == '__main__':
         # TODO: check in config file if we want this
         app.args.rmolder = DEFAULTLISTDAYS
         dormolderaction(app)
+        dostallaction(app)
