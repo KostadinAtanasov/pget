@@ -314,7 +314,7 @@ class App:
         for f in os.listdir(path):
             if f.endswith('.downloading'):
                 os.unlink(os.path.join(path, f))
-                if slef.args.tell:
+                if self.args.tell:
                     print('%s removed' % f)
 
     def cleanolder(self, days):
