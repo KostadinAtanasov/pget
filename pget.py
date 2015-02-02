@@ -318,6 +318,8 @@ class App:
                     print('%s removed' % f)
 
     def cleanolder(self, days):
+        if float(days) == 0.0:
+            return
         st = time.time() - (24 * 60 * 60 * float(days))
         cleaned = False
         for secstr in self.dconfig:
