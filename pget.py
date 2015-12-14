@@ -322,6 +322,7 @@ class App:
             return
         st = time.time() - (24 * 60 * 60 * float(days))
         cleaned = False
+        secs_todel = []
         for secstr in self.dconfig:
             sec = self.dconfig[secstr]
             if 'time' in sec:
@@ -329,10 +330,12 @@ class App:
                 if (t - st) < 0:
                     if os.path.isfile(sec['path']):
                         os.unlink(sec['path'])
-                    self.dconfig.remove_section(secstr)
+                    secs_todel.append(secstr)
                     cleaned = True
                     if self.args.tell:
                         print('%s removed' % secstr)
+        for secstr in secs_todel:
+            self.dconfig.remove_section(secstr)
         if cleaned:
             with open(self.downfile, 'w') as f:
                 self.dconfig.write(f)
